@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 # intro = open('docs/source/intro.rst').read()
 
-setup(name="batchbeagle",
+setup(name="glr.batchbeagle",
       version=__version__,
       description="AWS Batch related deployment tools",
       author="Caltech IMSS ADS",

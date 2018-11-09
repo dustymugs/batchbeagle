@@ -768,7 +768,7 @@ class BatchManager(object):
             print('Jobs submitted: {}'.format(jobs_submitted))
             sys.stdout.flush()
 
-    def get_jobs(self, queue):
+    def get_jobs(self, queue, filter_statuses=None):
         jobs = []
         statuses = {
             'SUBMITTED': 0,
@@ -780,7 +780,16 @@ class BatchManager(object):
             'FAILED': 0
         }
 
+        if filter_statuses is None:
+            filter_statuses = statuses.keys()
+        elif not hasattr(filter_statuses, '__iter__'):
+            raise TypeError('filter_statuses must be an iterable')
+
         for status in statuses.keys():
+
+            if status not in filter_statuses:
+                continue
+
             nextToken = ''
             while True:
                 response = self.batch.list_jobs(jobQueue=queue, jobStatus=status, nextToken=nextToken)
@@ -789,11 +798,26 @@ class BatchManager(object):
                     for job in joblist:
                         jobs.append(job['jobId'])
                         statuses[status] += 1
-                nextToken = response.get('nextToken', None)
+                nextToken = response.get('nextToken', '')
                 if not nextToken:
                     break
 
         return jobs, statuses
+
+    def get_job_details(self, job_ids):
+
+        idx = 0
+        size = 100
+        num_job_ids = len(job_ids)
+
+        job_details = []
+        while idx <= num_job_ids:
+            job_details.extend(
+                self.batch.describe_jobs(jobs=job_ids[idx:idx+size])['jobs']
+            )
+            idx += size
+
+        return job_details
 
     def list_jobs(self, queue):
         jobs, statuses = self.get_jobs(queue)
@@ -824,6 +848,28 @@ class BatchManager(object):
 
     def terminate_job(self, job_id, reason):
         self.batch.terminate_job(jobId=job_id, reason=reason)
+
+    def retry_failed_jobs(self, queue):
+        reason = "Retrying all failed jobs."
+        job_ids, statuses = self.get_jobs(queue, filter_statuses=['FAILED'])
+        jobs = self.get_job_details(job_ids)
+
+        rtn = []
+        for job in jobs:
+            self.submit_job(
+                name=job['jobName'],
+                job_description=job['jobDefinition'].split('/')[1].split(':')[0],
+                queue=queue,
+                parameters=job['parameters']
+            )
+            rtn.append([job['jobId'], job['jobName'], job['parameters']])
+            print('Retrying: {}, {}, {}'.format(
+                job['jobId'],
+                job['jobName'],
+                job['parameters']
+            ))
+
+        return rtn
 
     def cancel_all_jobs(self, queue):
         reason = "Cancelling all jobs."

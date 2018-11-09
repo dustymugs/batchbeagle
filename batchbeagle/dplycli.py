@@ -188,6 +188,16 @@ def cancel(ctx, queue):
 @job.command()
 @click.pass_context
 @click.argument('queue')
+def retry(ctx, queue):
+    """
+    Retry all failed jobs.
+    """
+    mgr = BatchManager(filename=ctx.obj['CONFIG_FILE'])
+    mgr.retry_failed_jobs(queue)
+
+@job.command()
+@click.pass_context
+@click.argument('queue')
 def terminate(ctx, queue):
     """
     Terminate all jobs.
@@ -234,6 +244,18 @@ def deregister(ctx, job_definition):
     """
     mgr = BatchManager(filename=ctx.obj['CONFIG_FILE'])
     mgr.deregister_job_definition(job_definition)
+
+@job.command()
+@click.pass_context
+@click.argument('queue')
+def status(ctx, queue):
+    """
+    Get the number of jobs per status in queue
+    """
+    mgr = BatchManager(filename=ctx.obj['CONFIG_FILE'])
+    lines, runnable_count = mgr.list_jobs(queue)
+    for line in lines:
+        click.echo(line)
 
 @cli.command(short_help='Assemble all Batch resoures defined in a configuration')
 @click.pass_context
